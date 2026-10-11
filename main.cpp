@@ -9,6 +9,11 @@
 #include "Stack.cpp"
 
 #define CODE_CAPACITY 1024
+#define MAX_REGISTERS 5
+
+#define RED "\x1b[31m"
+#define RESETC "\x1b[0m"
+#define GREEN "\x1b[32m"
 
 enum Commands
 {
@@ -18,6 +23,10 @@ enum Commands
     SUB    = 3,
     DIVari = 4,
     OUT    = 5,
+    MULT   = 6,
+    PUSHr  = 7,
+    POPr   = 8,
+    JMP    = 9,
 };
 
 struct File
@@ -27,8 +36,25 @@ struct File
     struct stat st;
 };
 
+struct Code
+{
+    int *buffer;
+    size_t buffer_size;
+    int ip;
+
+    int *registers;
+};
+
 int ReadFile(struct File *file, int buffer[]);
 
+void CodeDump(Code* Calc);
+
+int Add(stack* stk);
+int Sub(stack* stk);
+int Mult(stack* stk);
+int Div(stack* stk);
+
+int RunCode(Code* Calc, stack* stk);
 
 int main(int argc, char *argv[])
 {
@@ -39,55 +65,23 @@ int main(int argc, char *argv[])
     }
 
     int buffer[CODE_CAPACITY] = {};
+    int registers[MAX_REGISTERS] = {};
+
+    Code Calc = {};
+    Calc.buffer = buffer;
+    Calc.registers = registers;
+
     File input_file = {};
     input_file.filename = argv[1];
-    int buffer_size = ReadFile(&input_file, buffer);
 
+    Calc.buffer_size = ReadFile(&input_file, Calc.buffer);
 
     stack stk = {};
     InitStack(&stk, 10);
 
-
-    int ip = 0;
-    int a = 0;
-    int b = 0;
-    while(ip < buffer_size)
-    {
-        switch (buffer[ip])
-        {
-            case PUSH: 
-                StackPush(&stk, buffer[++ip]);
-                break;
-            case ADD:
-                b = StackPop(&stk);
-                a = StackPop(&stk);
-                StackPush(&stk, a + b);
-                break;
-            case SUB:
-                b = StackPop(&stk);
-                a = StackPop(&stk);
-                StackPush(&stk, a - b);
-                break;
-            case DIVari:
-                b = StackPop(&stk);
-                a = StackPop(&stk);
-                if (b == 0) { printf("division by zero\n"); return 1; }
-                StackPush(&stk, a / b);
-                break;
-            case OUT:
-                printf("%d", StackPop(&stk));
-                break;
-            case HLT:
-                return 0;
-            default: break;
-        }
-        ip ++;
-
-    }
-    
+    RunCode(&Calc, &stk);
 
 }
-
 
 int ReadFile(struct File *file, int buffer[])
 {
@@ -110,4 +104,116 @@ int ReadFile(struct File *file, int buffer[])
     close(file->file_descriptor);
 
     return real_buffer_size;
+}
+
+void CodeDump(Code* Calc)
+{
+    printf("-------CODE DUMP---------\n< ");
+
+    int i = 0;
+    while (i < Calc->buffer_size)
+    {
+        if (i == Calc->ip) printf(RED);
+
+        if (Calc->buffer[i] == PUSH || Calc->buffer[i] == PUSHr || Calc->buffer[i] == POPr || Calc->buffer[i] == JMP)
+        {
+            printf("%d %d ", Calc->buffer[i], Calc->buffer[i+1]);
+            i++;
+        }
+        else printf("%d ", Calc->buffer[i]);
+
+        printf(RESETC);
+        i++;
+    }
+    printf("0 >\n-------------------------\n");
+
+    int c = 0;
+    while ((c = getchar()) != '\n');
+}
+
+int Add(stack* stk)
+{
+    int a = StackPop(stk);
+    int b = StackPop(stk);
+    StackPush(stk, a + b);
+}
+
+int Sub(stack* stk)
+{
+    int a = StackPop(stk);
+    int b = StackPop(stk);
+    StackPush(stk, a - b);
+}
+
+int Mult(stack* stk)
+{
+    int a = StackPop(stk);
+    int b = StackPop(stk);
+    StackPush(stk, a * b);
+}
+
+int Div(stack* stk)
+{
+    int a = StackPop(stk);
+    int b = StackPop(stk);
+    if (b == 0)
+    {
+        printf("division by zero\n");
+        abort();
+    }
+    StackPush(stk, a / b);
+}
+
+int RunCode(Code* Calc, stack* stk)
+{
+    while(Calc->ip < Calc->buffer_size)
+    {
+        CodeDump(Calc);
+        getchar();
+
+        switch (Calc->buffer[Calc->ip])
+        {
+            case PUSH: 
+                StackPush(stk, Calc->buffer[++Calc->ip]);
+                Calc->ip++;
+                break;
+            case PUSHr:
+                StackPush(stk, Calc->registers[Calc->buffer[++Calc->ip]]);
+                Calc->ip++;
+                break;
+            case POPr:
+                Calc->registers[Calc->buffer[++Calc->ip]] = StackPop(stk);
+                Calc->ip++;
+                break;
+            case ADD:
+                Add(stk);
+                Calc->ip++;
+                break;
+            case SUB:
+                Sub(stk);
+                Calc->ip++;
+                break;
+            case MULT:
+                Mult(stk);
+                Calc->ip++;
+                break;
+            case DIVari:
+                Div(stk);
+                Calc->ip++;
+                break;
+            case JMP:
+                Calc->ip = Calc->buffer[Calc->ip + 1];
+                break;
+            case OUT:
+                printf(GREEN "OUT OUTPUT: <%d>\n" RESETC, StackPop(stk));
+                Calc->ip++;
+                break;
+            case HLT:
+                return 0;
+            default: break;
+        }
+        
+        //Calc->ip++;
+
+    } 
 }
