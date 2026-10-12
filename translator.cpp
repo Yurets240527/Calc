@@ -21,6 +21,7 @@ enum Commands
     PUSHr  = 7,
     POPr   = 8,
     JMP    = 9,
+    JA     = 10,
 };
 
 enum Registers
@@ -32,12 +33,25 @@ enum Registers
     DX = 4,
 };
 
+struct ReadData
+{
+    int* Labels;
 
-int FillBuffer(int *buffer, char lines[][MAX_COMMAN_LEN], int Labels[], bool* NeedSecondTurn);
+    int* buffer;
+    int code_len;
+    
+    bool NeedSecondTurn;
+
+};
+
+
+int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc);
 
 Registers ParceRegister(char *line);
 
 int ParceLabel(char* line);
+
+int ParceJump(char* line, ReadData* Calc, char* command);
 
 int main(int argc, char *argv[])
 {
@@ -58,25 +72,31 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    struct ReadData Calc = {};
+
     char lines[MAXLINES][MAX_COMMAN_LEN] = {};
 
     int Labels[MAX_LABELS] ={};
-    memset(Labels, -1, sizeof(Labels));
+    Calc.Labels = Labels;
+
+    memset(Calc.Labels, -1, sizeof(Calc.Labels));
 
     int i = 0;
     while (fgets(lines[i], MAX_COMMAN_LEN, fpin)) i++;
 
     int buffer[CODE_CAPACITY] = {};
+    Calc.buffer = buffer;
 
-    bool NeedSecondTurn = false;
+    Calc.NeedSecondTurn = false;
+    
 
-    size_t code_len  =  FillBuffer(buffer, lines, Labels, &NeedSecondTurn);
+    FillBuffer(lines, &Calc);
 
-    if (NeedSecondTurn) FillBuffer(buffer, lines, Labels, &NeedSecondTurn);
+    if (Calc.NeedSecondTurn) FillBuffer(lines, &Calc);
 
-    for(i = 0; i<code_len; i++) printf("%d ", buffer[i]);
+    for(i = 0; i<Calc.code_len; i++) printf("%d ", Calc.buffer[i]);
 
-    fwrite(buffer, sizeof(int), code_len, fpout);
+    fwrite(Calc.buffer, sizeof(int), Calc.code_len, fpout);
 
     fclose(fpin);
     fclose(fpout);
@@ -84,13 +104,14 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int FillBuffer(int *buffer, char lines[][MAX_COMMAN_LEN], int Labels[], bool* NeedSecondTurn)
+int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
 {
     char command[MAX_COMMAN_LEN] = {};
     int label = 0;
     int value = 0;
-    int code_len = 0;
     int register_code = 0;
+
+    Calc->code_len = 0;
 
     int i = 0;
     while ((sscanf(lines[i], "%s", command)) == 1)
@@ -99,13 +120,13 @@ int FillBuffer(int *buffer, char lines[][MAX_COMMAN_LEN], int Labels[], bool* Ne
         {
             if (sscanf(lines[i], "PUSH %d", &value))
             {
-                buffer[code_len++] = PUSH;
-                buffer[code_len++] = value;
+                Calc->buffer[Calc->code_len++] = PUSH;
+                Calc->buffer[Calc->code_len++] = value;
             }
             else if ((register_code = ParceRegister(&lines[i][5])) >= 0)
             {
-                buffer[code_len++] = PUSHr;
-                buffer[code_len++] = register_code;
+                Calc->buffer[Calc->code_len++] = PUSHr;
+                Calc->buffer[Calc->code_len++] = register_code;
             }
             else
             {
@@ -119,8 +140,8 @@ int FillBuffer(int *buffer, char lines[][MAX_COMMAN_LEN], int Labels[], bool* Ne
         {
             if ((register_code = ParceRegister(&lines[i][4])) >= 0)
             {
-                buffer[code_len++] = POPr;
-                buffer[code_len++] = register_code;
+                Calc->buffer[Calc->code_len++] = POPr;
+                Calc->buffer[Calc->code_len++] = register_code;
             }
             else
             {
@@ -130,42 +151,21 @@ int FillBuffer(int *buffer, char lines[][MAX_COMMAN_LEN], int Labels[], bool* Ne
                
         }
 
-        else if (strcmp(command, "JMP") == 0)
-        {
-            if (sscanf(lines[i], "JMP %d", &value))
-            {
-                buffer[code_len++] = JMP;
-                buffer[code_len++] = value;
-            }
+        else if (strcmp(command, "JMP") == 0 || strcmp(command, "JA") == 0) ParceJump(lines[i], Calc, command);
 
-            else if (sscanf(lines[i], "JMP :%d", &label))
-            {
-                buffer[code_len++] = JMP;
-                buffer[code_len++] = Labels[label];
-
-                if (Labels[label] < 0) *NeedSecondTurn = true;
-            }
-
-            else
-            {
-                printf("Error: JMP argument is wrong or doesn't exist\n");
-                return SyntaxError;
-            }
-               
-        }
-        else if (strcmp(command, "ADD" ) == 0) buffer[code_len++] = ADD;
+        else if (strcmp(command, "ADD" ) == 0) Calc->buffer[Calc->code_len++] = ADD;
         
-        else if (strcmp(command, "SUB" ) == 0) buffer[code_len++] = SUB;
+        else if (strcmp(command, "SUB" ) == 0) Calc->buffer[Calc->code_len++] = SUB;
 
-        else if (strcmp(command, "MULT" ) == 0) buffer[code_len++] = MULT;
+        else if (strcmp(command, "MULT" ) == 0) Calc->buffer[Calc->code_len++] = MULT;
 
-        else if (strcmp(command, "DIV" ) == 0) buffer[code_len++] = DIVari;
+        else if (strcmp(command, "DIV" ) == 0) Calc->buffer[Calc->code_len++] = DIVari;
 
-        else if (strcmp(command, "OUT" ) == 0) buffer[code_len++] = OUT;
+        else if (strcmp(command, "OUT" ) == 0) Calc->buffer[Calc->code_len++] = OUT;
 
-        else if (strcmp(command, "HLT" ) == 0) buffer[code_len++] = HLT;
+        else if (strcmp(command, "HLT" ) == 0) Calc->buffer[Calc->code_len++] = HLT;
 
-        else if ((label = ParceLabel(lines[i])) > 0) Labels[label] = code_len;
+        else if ((label = ParceLabel(lines[i])) > 0) Calc->Labels[label] = Calc->code_len;
 
         else 
         {
@@ -177,7 +177,7 @@ int FillBuffer(int *buffer, char lines[][MAX_COMMAN_LEN], int Labels[], bool* Ne
 
     }
 
-    return code_len;
+    return Calc->code_len;
 }
 
 Registers ParceRegister(char* line)
@@ -200,4 +200,40 @@ int ParceLabel(char* line)
     if (label > MAX_LABELS) return -1;
 
     return label;
+}
+
+int ParceJump(char* line, ReadData* Calc, char* command)
+{
+    int label = 0;
+    int value = 0;
+
+    
+    int opcode = (strcmp(command, "JMP") == 0) ? JMP : JA;
+
+    if (sscanf(line, "%*s %d", &value) == 1)
+    {
+        Calc->buffer[Calc->code_len++] = opcode;
+        Calc->buffer[Calc->code_len++] = value;
+    }
+        
+    else if (sscanf(line, "%*s :%d", &label) == 1)
+    {
+        Calc->buffer[Calc->code_len++] = opcode;
+        Calc->buffer[Calc->code_len++] = Calc->Labels[label];
+
+        if (Calc->Labels[label] < 0) Calc->NeedSecondTurn = true;
+    }
+    else
+    {
+        printf("Error: %s argument is wrong or doesn't exist\n", command);
+        return SyntaxError;
+    }
+
+    return 0;
+
+}
+
+int ParcePop(char* line, ReadData* Calc, char* command)
+{
+    
 }
