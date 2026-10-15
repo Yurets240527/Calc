@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_COMMAN_LEN 30
+#define MAX_COMMAN_LEN 1000
 #define MAXLINES 1000
 #define MAX_LABELS 20
 #define SyntaxError 1
@@ -22,6 +22,10 @@ enum Commands
     POPr   = 8,
     JMP    = 9,
     JA     = 10,
+    IN     = 11,
+    CALL   = 12,
+    RET    = 13,
+    SQRT   = 14,
 };
 
 enum Registers
@@ -53,6 +57,10 @@ int ParceLabel(char* line);
 
 int ParceJump(char* line, ReadData* Calc, char* command);
 
+int ParceCall(char* line, ReadData* Calc);
+
+int strip_comment(char *line);
+
 int main(int argc, char *argv[])
 {
     if (argc < 3)
@@ -77,9 +85,10 @@ int main(int argc, char *argv[])
     char lines[MAXLINES][MAX_COMMAN_LEN] = {};
 
     int Labels[MAX_LABELS] ={};
+
     Calc.Labels = Labels;
 
-    memset(Calc.Labels, -1, sizeof(Calc.Labels));
+    memset(Calc.Labels, -1, sizeof(Labels));
 
     int i = 0;
     while (fgets(lines[i], MAX_COMMAN_LEN, fpin)) i++;
@@ -95,6 +104,9 @@ int main(int argc, char *argv[])
     if (Calc.NeedSecondTurn) FillBuffer(lines, &Calc);
 
     for(i = 0; i<Calc.code_len; i++) printf("%d ", Calc.buffer[i]);
+    printf("\nLABELS: ");
+    
+    for(i = 0; i<MAX_LABELS; i++) printf("%d ", Labels[i]);
 
     fwrite(Calc.buffer, sizeof(int), Calc.code_len, fpout);
 
@@ -114,11 +126,17 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
     Calc->code_len = 0;
 
     int i = 0;
-    while ((sscanf(lines[i], "%s", command)) == 1)
+    while (i < MAXLINES)
     {
+        /*char line[MAX_COMMAN_LEN] = {};
+        strncpy(line, lines[i], MAX_COMMAN_LEN - 1);*/
+        strip_comment(lines[i]);
+
+        if (sscanf(lines[i], "%s", command) != 1) { i++; continue; }
+
         if (strcmp(command, "PUSH") == 0)
         {
-            if (sscanf(lines[i], "PUSH %d", &value))
+            if (sscanf(lines[i], "PUSH %d%*s", &value))
             {
                 Calc->buffer[Calc->code_len++] = PUSH;
                 Calc->buffer[Calc->code_len++] = value;
@@ -153,6 +171,12 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
 
         else if (strcmp(command, "JMP") == 0 || strcmp(command, "JA") == 0) ParceJump(lines[i], Calc, command);
 
+        else if (strcmp(command, "CALL") == 0) ParceCall(lines[i], Calc);
+
+        else if (strcmp(command, "RET" ) == 0) Calc->buffer[Calc->code_len++] = RET;
+
+        else if (strcmp(command, "IN" ) == 0) Calc->buffer[Calc->code_len++] = IN;
+
         else if (strcmp(command, "ADD" ) == 0) Calc->buffer[Calc->code_len++] = ADD;
         
         else if (strcmp(command, "SUB" ) == 0) Calc->buffer[Calc->code_len++] = SUB;
@@ -160,6 +184,8 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
         else if (strcmp(command, "MULT" ) == 0) Calc->buffer[Calc->code_len++] = MULT;
 
         else if (strcmp(command, "DIV" ) == 0) Calc->buffer[Calc->code_len++] = DIVari;
+
+        else if (strcmp(command, "SQRT" ) == 0) Calc->buffer[Calc->code_len++] = SQRT;
 
         else if (strcmp(command, "OUT" ) == 0) Calc->buffer[Calc->code_len++] = OUT;
 
@@ -231,6 +257,39 @@ int ParceJump(char* line, ReadData* Calc, char* command)
 
     return 0;
 
+}
+
+int ParceCall(char* line, ReadData* Calc)
+{
+    int label = 0;
+  
+    if (sscanf(line, "%*s :%d%*s", &label) == 1)
+    {
+        Calc->buffer[Calc->code_len++] = CALL;
+        Calc->buffer[Calc->code_len++] = Calc->Labels[label];
+
+        if (Calc->Labels[label] < 0) Calc->NeedSecondTurn = true;
+    }
+    else
+    {
+        printf("Error: CALL argument is wrong or doesn't exist\n");
+        return SyntaxError;
+    }
+
+    return 0;
+
+}
+
+int strip_comment(char *line)
+{
+    for (int i = 0; line[i]; i++)
+    {
+        if (line[i] == ';' || line[i] == '#')
+        {
+            line[i] = '\0';
+            return 0;
+        }
+    }
 }
 
 int ParcePop(char* line, ReadData* Calc, char* command)

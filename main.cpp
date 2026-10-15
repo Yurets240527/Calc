@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -8,7 +9,7 @@
 #include <sys/stat.h>
 #include "Stack.cpp"
 
-#define CODE_CAPACITY 1024
+#define CODE_CAPACITY 10000
 #define MAX_REGISTERS 5
 
 #define RED "\x1b[31m"
@@ -28,6 +29,10 @@ enum Commands
     POPr   = 8,
     JMP    = 9,
     JA     = 10,
+    IN     = 11,
+    CALL   = 12,
+    RET    = 13,
+    SQRT   = 14,
 };
 
 struct File
@@ -44,6 +49,8 @@ struct Code
     int ip;
 
     int *registers;
+
+    stack ret;
 };
 
 int ReadFile(struct File *file, int buffer[]);
@@ -54,6 +61,9 @@ int Add (stack* stk, Code* Calc);
 int Sub (stack* stk, Code* Calc);
 int Mult(stack* stk, Code* Calc);
 int Div (stack* stk, Code* Calc);
+
+int Jump_A(stack* stk, Code* Calc);
+int In(stack* stk, Code* Calc);
 
 int RunCode(Code* Calc, stack* stk);
 
@@ -71,6 +81,7 @@ int main(int argc, char *argv[])
     Code Calc = {};
     Calc.buffer = buffer;
     Calc.registers = registers;
+    InitStack(&Calc.ret, 10);
 
     File input_file = {};
     input_file.filename = argv[1];
@@ -117,7 +128,7 @@ void CodeDump(Code* Calc)
         if (i == Calc->ip) printf(RED);
 
         if (Calc->buffer[i] == PUSH || Calc->buffer[i] == PUSHr
-         || Calc->buffer[i] == POPr || Calc->buffer[i] == JA)
+         || Calc->buffer[i] == POPr || Calc->buffer[i] == JA || Calc->buffer[i] == CALL)
         {
             printf("%d %d ", Calc->buffer[i], Calc->buffer[i+1]);
             i++;
@@ -127,10 +138,10 @@ void CodeDump(Code* Calc)
         printf(RESETC);
         i++;
     }
-    printf("0 >\n-------------------------\n");
+    printf(" >\n-------------------------\n");
 
-    int c = 0;
-    while ((c = getchar()) != '\n');
+    /*int c = 0;
+    while ((c = getchar()) != '\n');*/
 }
 
 int Add(stack* stk, Code* Calc)
@@ -148,7 +159,7 @@ int Sub(stack* stk, Code* Calc)
     int a = StackPop(stk);
     int b = StackPop(stk);
 
-    StackPush(stk, a - b);
+    StackPush(stk, b - a);
 
     Calc->ip++;
 
@@ -168,13 +179,22 @@ int Div(stack* stk, Code* Calc)
 {
     int a = StackPop(stk);
     int b = StackPop(stk);
-    if (b == 0)
+    if (a == 0)
     {
         printf("division by zero\n");
         abort();
     }
 
-    StackPush(stk, a / b);
+    StackPush(stk, b / a);
+
+    Calc->ip++;
+}
+
+int Sqrt(stack* stk, Code* Calc)
+{
+    double a = (double) StackPop(stk);
+
+    StackPush(stk, (int) sqrt(a));
 
     Calc->ip++;
 }
@@ -188,12 +208,28 @@ int Jump_A(stack* stk, Code* Calc)
     else Calc->ip += 2;
 }
 
+int Call(Code* Calc)
+{
+    StackPush(&Calc->ret, Calc->ip+2);
+    Calc->ip = Calc->buffer[Calc->ip + 1];
+}
+
+int In(stack* stk, Code* Calc)
+{
+    int val = 0;
+    if (!scanf("%d", &val)) abort();
+    StackPush(stk, val);
+    Calc->ip ++;
+    return 0;
+}
+
 int RunCode(Code* Calc, stack* stk)
 {
     while(Calc->ip < Calc->buffer_size)
     {
-        CodeDump(Calc);
-        getchar();
+        //CodeDump(Calc);
+        //STACK_DUMP(*stk);
+        //getchar();
 
         switch (Calc->buffer[Calc->ip])
         {
@@ -204,6 +240,10 @@ int RunCode(Code* Calc, stack* stk)
             case PUSHr:
                 StackPush(stk, Calc->registers[Calc->buffer[++Calc->ip]]);
                 Calc->ip++;
+                break;
+
+            case IN:
+                In(stk, Calc);
                 break;
 
             case POPr:
@@ -223,12 +263,23 @@ int RunCode(Code* Calc, stack* stk)
             case DIVari:
                 Div (stk, Calc);
                 break;
+            case SQRT:
+                Sqrt(stk, Calc);
+                break;
 
             case JMP:
                 Calc->ip = Calc->buffer[Calc->ip + 1];
                 break;
             case JA:
                 Jump_A(stk, Calc);
+                break;
+
+            case CALL:
+                Call(Calc);
+                break;
+            case RET:
+                //STACK_DUMP(Calc->ret);
+                Calc->ip = StackPop(&Calc->ret);
                 break;
 
             case OUT:
