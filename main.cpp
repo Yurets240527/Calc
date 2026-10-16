@@ -11,6 +11,8 @@
 
 #define CODE_CAPACITY 10000
 #define MAX_REGISTERS 5
+#define MAX_RAM 100
+#define SCREEN_WIDE 10
 
 #define RED "\x1b[31m"
 #define RESETC "\x1b[0m"
@@ -33,6 +35,12 @@ enum Commands
     CALL   = 12,
     RET    = 13,
     SQRT   = 14,
+    JE     = 15,
+    PUSHM  = 16,
+    PUSHMr = 17,
+    POPM   = 18,
+    POPMr  = 19,
+    RAM    = 20,
 };
 
 struct File
@@ -51,6 +59,8 @@ struct Code
     int *registers;
 
     stack ret;
+
+    int* RAM;
 };
 
 int ReadFile(struct File *file, int buffer[]);
@@ -65,6 +75,8 @@ int Div (stack* stk, Code* Calc);
 int Jump_A(stack* stk, Code* Calc);
 int In(stack* stk, Code* Calc);
 
+int PrintRAM(int* RAM);
+
 int RunCode(Code* Calc, stack* stk);
 
 int main(int argc, char *argv[])
@@ -77,10 +89,12 @@ int main(int argc, char *argv[])
 
     int buffer[CODE_CAPACITY] = {};
     int registers[MAX_REGISTERS] = {};
+    int RAM[MAX_RAM] = {};
 
     Code Calc = {};
     Calc.buffer = buffer;
     Calc.registers = registers;
+    Calc.RAM = RAM;
     InitStack(&Calc.ret, 10);
 
     File input_file = {};
@@ -208,6 +222,15 @@ int Jump_A(stack* stk, Code* Calc)
     else Calc->ip += 2;
 }
 
+int Jump_E(stack* stk, Code* Calc)
+{
+    int a = StackPop(stk);
+    int b = StackPop(stk);
+
+    if (a == b) Calc->ip = Calc->buffer[Calc->ip + 1];
+    else Calc->ip += 2;
+}
+
 int Call(Code* Calc)
 {
     StackPush(&Calc->ret, Calc->ip+2);
@@ -241,13 +264,29 @@ int RunCode(Code* Calc, stack* stk)
                 StackPush(stk, Calc->registers[Calc->buffer[++Calc->ip]]);
                 Calc->ip++;
                 break;
+            case PUSHM: 
+                StackPush(stk, Calc->RAM[Calc->buffer[++Calc->ip]]);
+                Calc->ip++;
+                break;
+            case PUSHMr:
+                StackPush(stk, Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]]);
+                Calc->ip++;
+                break;
 
             case IN:
                 In(stk, Calc);
                 break;
-
+            
             case POPr:
                 Calc->registers[Calc->buffer[++Calc->ip]] = StackPop(stk);
+                Calc->ip++;
+                break;
+            case POPM:
+                Calc->RAM[Calc->buffer[++Calc->ip]] = StackPop(stk);
+                Calc->ip++;
+                break;
+            case POPMr:
+                Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]] = StackPop(stk);
                 Calc->ip++;
                 break;
 
@@ -273,6 +312,9 @@ int RunCode(Code* Calc, stack* stk)
             case JA:
                 Jump_A(stk, Calc);
                 break;
+            case JE:
+                Jump_E(stk, Calc);
+                break;
 
             case CALL:
                 Call(Calc);
@@ -286,6 +328,10 @@ int RunCode(Code* Calc, stack* stk)
                 printf(GREEN "OUT OUTPUT: <%d>\n" RESETC, StackPop(stk));
                 Calc->ip++;
                 break;
+            case RAM:
+                PrintRAM(Calc->RAM);
+                Calc->ip++;
+                break;
 
             case HLT:
                 return 0;
@@ -293,4 +339,18 @@ int RunCode(Code* Calc, stack* stk)
         }
         
     } 
+}
+
+int PrintRAM(int* RAM)
+{
+    int i = 0;
+    while (i < MAX_RAM)
+    {
+        if (RAM[i]) putchar('*');
+        else putchar('.');
+
+        if ((i + 1) % SCREEN_WIDE == 0) putchar('\n');
+
+        i++;
+    }
 }

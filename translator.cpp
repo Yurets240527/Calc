@@ -26,6 +26,12 @@ enum Commands
     CALL   = 12,
     RET    = 13,
     SQRT   = 14,
+    JE     = 15,
+    PUSHM  = 16,
+    PUSHMr = 17,
+    POPM   = 18,
+    POPMr  = 19,
+    RAM    = 20,
 };
 
 enum Registers
@@ -51,7 +57,7 @@ struct ReadData
 
 int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc);
 
-Registers ParceRegister(char *line);
+int ParceRegister(char *line);
 
 int ParceLabel(char* line);
 
@@ -154,6 +160,26 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
                
         }
 
+        else if (strcmp(command, "PUSHM") == 0)
+        {
+            if (sscanf(lines[i], "PUSHM [%d]%*s", &value))
+            {
+                Calc->buffer[Calc->code_len++] = PUSHM;
+                Calc->buffer[Calc->code_len++] = value;
+            }
+            else if ((register_code = ParceRegister(&lines[i][7])) >= 0)
+            {
+                Calc->buffer[Calc->code_len++] = PUSHMr;
+                Calc->buffer[Calc->code_len++] = register_code;
+            }
+            else
+            {
+                printf("Error: PUSHM argument is spoiled or doesn't exist\n");
+                return SyntaxError;
+            }
+               
+        }
+
         else if (strcmp(command, "POP") == 0)
         {
             if ((register_code = ParceRegister(&lines[i][4])) >= 0)
@@ -169,7 +195,27 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
                
         }
 
-        else if (strcmp(command, "JMP") == 0 || strcmp(command, "JA") == 0) ParceJump(lines[i], Calc, command);
+        else if (strcmp(command, "POPM") == 0)
+        {
+            if (sscanf(lines[i], "POPM [%d]%*s", &value))
+            {
+                Calc->buffer[Calc->code_len++] = POPM;
+                Calc->buffer[Calc->code_len++] = value;
+            }
+            else if ((register_code = ParceRegister(&lines[i][6])) >= 0)
+            {
+                Calc->buffer[Calc->code_len++] = POPMr;
+                Calc->buffer[Calc->code_len++] = register_code;
+            }
+            else
+            {
+                printf("Error: POPM argument is spoiled or doesn't exist\n");
+                return SyntaxError;
+            }
+               
+        }
+
+        else if (ParceJump(lines[i], Calc, command) > 0) {i++; continue;}
 
         else if (strcmp(command, "CALL") == 0) ParceCall(lines[i], Calc);
 
@@ -189,9 +235,11 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
 
         else if (strcmp(command, "OUT" ) == 0) Calc->buffer[Calc->code_len++] = OUT;
 
+        else if (strcmp(command, "RAM" ) == 0) Calc->buffer[Calc->code_len++] = RAM;
+
         else if (strcmp(command, "HLT" ) == 0) Calc->buffer[Calc->code_len++] = HLT;
 
-        else if ((label = ParceLabel(lines[i])) > 0) Calc->Labels[label] = Calc->code_len;
+        else if ((label = ParceLabel(lines[i])) >= 0) Calc->Labels[label] = Calc->code_len;
 
         else 
         {
@@ -206,12 +254,15 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
     return Calc->code_len;
 }
 
-Registers ParceRegister(char* line)
+int ParceRegister(char* line)
 {
-    if (strcmp(line, "AX\n") == 0) return AX;
+    /*if (strcmp(line, "AX\n") == 0) return AX;
     if (strcmp(line, "BX\n") == 0) return BX;
     if (strcmp(line, "CX\n") == 0) return CX;
-    if (strcmp(line, "DX\n") == 0) return DX;
+    if (strcmp(line, "DX\n") == 0) return DX;*/
+
+    int reg_code = 0;
+    if (sscanf(line, "%cX%*s", &reg_code) == 1) return reg_code - 64;
 
     return NO_REGISTERS;
     
@@ -234,7 +285,11 @@ int ParceJump(char* line, ReadData* Calc, char* command)
     int value = 0;
 
     
-    int opcode = (strcmp(command, "JMP") == 0) ? JMP : JA;
+    int opcode = 0;
+    if      (strcmp(command, "JMP") == 0) opcode = JMP;
+    else if (strcmp(command, "JA") == 0)  opcode = JA;
+    else if (strcmp(command, "JE") == 0)  opcode = JE;
+    else return -1;
 
     if (sscanf(line, "%*s %d", &value) == 1)
     {
@@ -255,7 +310,7 @@ int ParceJump(char* line, ReadData* Calc, char* command)
         return SyntaxError;
     }
 
-    return 0;
+    return opcode;
 
 }
 
