@@ -6,7 +6,7 @@
 #define MAX_COMMAN_LEN 1000
 #define MAXLINES 1000
 #define MAX_LABELS 20
-#define SyntaxError 1
+#define SyntaxError -1
 #define CODE_CAPACITY 1024
 
 enum Commands
@@ -64,6 +64,10 @@ int ParceLabel(char* line);
 int ParceJump(char* line, ReadData* Calc, char* command);
 
 int ParceCall(char* line, ReadData* Calc);
+
+int ParcePush(char* line, ReadData* Calc, char* command);
+
+int ParcePop(char* line, ReadData* Calc, char* command);
 
 int strip_comment(char *line);
 
@@ -134,86 +138,13 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
     int i = 0;
     while (i < MAXLINES)
     {
-        /*char line[MAX_COMMAN_LEN] = {};
-        strncpy(line, lines[i], MAX_COMMAN_LEN - 1);*/
         strip_comment(lines[i]);
 
         if (sscanf(lines[i], "%s", command) != 1) { i++; continue; }
 
-        if (strcmp(command, "PUSH") == 0)
-        {
-            if (sscanf(lines[i], "PUSH %d%*s", &value))
-            {
-                Calc->buffer[Calc->code_len++] = PUSH;
-                Calc->buffer[Calc->code_len++] = value;
-            }
-            else if ((register_code = ParceRegister(&lines[i][5])) >= 0)
-            {
-                Calc->buffer[Calc->code_len++] = PUSHr;
-                Calc->buffer[Calc->code_len++] = register_code;
-            }
-            else
-            {
-                printf("Error: PUSH without argument\n");
-                return SyntaxError;
-            }
-               
-        }
+        else if (ParcePush(lines[i], Calc, command) > 0) {i++; continue;}
 
-        else if (strcmp(command, "PUSHM") == 0)
-        {
-            if (sscanf(lines[i], "PUSHM [%d]%*s", &value))
-            {
-                Calc->buffer[Calc->code_len++] = PUSHM;
-                Calc->buffer[Calc->code_len++] = value;
-            }
-            else if ((register_code = ParceRegister(&lines[i][7])) >= 0)
-            {
-                Calc->buffer[Calc->code_len++] = PUSHMr;
-                Calc->buffer[Calc->code_len++] = register_code;
-            }
-            else
-            {
-                printf("Error: PUSHM argument is spoiled or doesn't exist\n");
-                return SyntaxError;
-            }
-               
-        }
-
-        else if (strcmp(command, "POP") == 0)
-        {
-            if ((register_code = ParceRegister(&lines[i][4])) >= 0)
-            {
-                Calc->buffer[Calc->code_len++] = POPr;
-                Calc->buffer[Calc->code_len++] = register_code;
-            }
-            else
-            {
-                printf("Error: POP argument is wrong or doesn't exist\n");
-                return SyntaxError;
-            }
-               
-        }
-
-        else if (strcmp(command, "POPM") == 0)
-        {
-            if (sscanf(lines[i], "POPM [%d]%*s", &value))
-            {
-                Calc->buffer[Calc->code_len++] = POPM;
-                Calc->buffer[Calc->code_len++] = value;
-            }
-            else if ((register_code = ParceRegister(&lines[i][6])) >= 0)
-            {
-                Calc->buffer[Calc->code_len++] = POPMr;
-                Calc->buffer[Calc->code_len++] = register_code;
-            }
-            else
-            {
-                printf("Error: POPM argument is spoiled or doesn't exist\n");
-                return SyntaxError;
-            }
-               
-        }
+        else if (ParcePop (lines[i], Calc, command) > 0) {i++; continue;}
 
         else if (ParceJump(lines[i], Calc, command) > 0) {i++; continue;}
 
@@ -256,16 +187,10 @@ int FillBuffer(char lines[][MAX_COMMAN_LEN], ReadData* Calc)
 
 int ParceRegister(char* line)
 {
-    /*if (strcmp(line, "AX\n") == 0) return AX;
-    if (strcmp(line, "BX\n") == 0) return BX;
-    if (strcmp(line, "CX\n") == 0) return CX;
-    if (strcmp(line, "DX\n") == 0) return DX;*/
-
-    int reg_code = 0;
+    char reg_code = 0;
     if (sscanf(line, "%cX%*s", &reg_code) == 1) return reg_code - 64;
 
     return NO_REGISTERS;
-    
 }
 
 int ParceLabel(char* line)
@@ -284,7 +209,6 @@ int ParceJump(char* line, ReadData* Calc, char* command)
     int label = 0;
     int value = 0;
 
-    
     int opcode = 0;
     if      (strcmp(command, "JMP") == 0) opcode = JMP;
     else if (strcmp(command, "JA") == 0)  opcode = JA;
@@ -347,7 +271,95 @@ int strip_comment(char *line)
     }
 }
 
+int ParcePush(char* line, ReadData* Calc, char* command)
+{
+    int value = 0;
+    int reg = 0;
+    if (strcmp(command, "PUSH") == 0)
+    {
+        if (sscanf(line, "PUSH %d%*s", &value))
+        {
+            Calc->buffer[Calc->code_len++] = PUSH;
+            Calc->buffer[Calc->code_len++] = value;
+        }
+        else if ((reg = ParceRegister(line+5)) >= 0)
+        {
+            Calc->buffer[Calc->code_len++] = PUSHr;
+            Calc->buffer[Calc->code_len++] = reg;
+        }
+        else
+        {
+            printf("Error: PUSH without argument\n");
+            return SyntaxError;
+        }        
+    }
+
+    else if (strcmp(command, "PUSHM") == 0)
+    {
+        if (sscanf(line, "PUSHM [%d]%*s", &value))
+        {
+            Calc->buffer[Calc->code_len++] = PUSHM;
+            Calc->buffer[Calc->code_len++] = value;
+        }
+        else if ((reg = ParceRegister(line+7)) >= 0)
+        {
+            Calc->buffer[Calc->code_len++] = PUSHMr;
+            Calc->buffer[Calc->code_len++] = reg;
+        }
+        else
+        {
+            printf("Error: PUSHM argument is spoiled or doesn't exist\n");
+            return SyntaxError;
+        }
+               
+    }
+    
+    else return -1;
+
+    return 1;
+}
+
 int ParcePop(char* line, ReadData* Calc, char* command)
 {
-    
+    int value = 0;
+    int reg = 0;
+
+    if (strcmp(command, "POP") == 0)
+    {
+        if ((reg = ParceRegister(line + 4)) >= 0)
+        {
+            Calc->buffer[Calc->code_len++] = POPr;
+            Calc->buffer[Calc->code_len++] = reg;
+        }
+        else
+        {
+            printf("Error: POP argument is wrong or doesn't exist\n");
+            return SyntaxError;
+        }
+               
+    }
+
+    else if (strcmp(command, "POPM") == 0)
+    {
+        if (sscanf(line, "POPM [%d]%*s", &value))
+        {
+            Calc->buffer[Calc->code_len++] = POPM;
+            Calc->buffer[Calc->code_len++] = value;
+        }
+        else if ((reg = ParceRegister(line + 6)) >= 0)
+        {
+            Calc->buffer[Calc->code_len++] = POPMr;
+            Calc->buffer[Calc->code_len++] = reg;
+        }
+        else
+        {
+            printf("Error: POPM argument is spoiled or doesn't exist\n");
+            return SyntaxError;
+        }
+               
+    }
+
+    else return -1;
+
+    return 1;
 }

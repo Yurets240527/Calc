@@ -346,9 +346,10 @@ int PrintRAM(int* RAM)
     int i = 0;
     while (i < MAX_RAM)
     {
-        if (RAM[i]) putchar('*');
+        if (RAM[i]) printf(GREEN "*" RESETC);
         else putchar('.');
-
+        putchar(' ');
+        
         if ((i + 1) % SCREEN_WIDE == 0) putchar('\n');
 
         i++;
