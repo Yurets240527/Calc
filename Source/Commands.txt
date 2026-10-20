@@ -1,0 +1,78 @@
+;init coefs
+PUSH 0
+POP AX
+PUSH 0
+POP BX
+PUSH 0
+POP CX
+
+:0
+PUSH 0
+POP AX   ;new line
+
+:1
+PUSH AX
+PUSH 5   ;center in X-coordinate 5
+SUB
+POP DX
+
+PUSH DX
+PUSH DX
+MULT
+
+PUSH BX
+PUSH 5  ;center in Y-coordinate 5
+SUB
+POP DX
+
+PUSH DX
+PUSH DX
+MULT
+
+ADD
+POP DX  ;(x-5)^2 + (y-5)^2
+
+PUSH 9
+PUSH DX
+JA :2
+
+PUSH 1
+POPM [CX]
+JMP :3
+
+:2
+PUSH 0
+POPM [CX]
+
+:3
+PUSH CX
+PUSH 1
+ADD
+POP CX
+
+PUSH AX
+PUSH 1
+ADD
+POP AX
+
+PUSH AX
+PUSH 10
+JE :4
+
+JMP :1
+
+:4
+PUSH BX
+PUSH 1
+ADD
+POP BX
+
+PUSH BX
+PUSH 10
+JE :5
+
+JMP :0
+
+:5
+RAM
+HLT
