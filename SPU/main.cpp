@@ -1,3 +1,4 @@
+//#include <TXLib.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -29,6 +30,8 @@ struct File
 
 struct Code
 {
+    stack stk;
+
     int *buffer;
     size_t buffer_size;
     int ip;
@@ -44,17 +47,63 @@ int ReadFile(struct File *file, int buffer[]);
 
 void CodeDump(Code* Calc);
 
-int Add (stack* stk, Code* Calc);
-int Sub (stack* stk, Code* Calc);
-int Mult(stack* stk, Code* Calc);
-int Div (stack* stk, Code* Calc);
+int Add (Code* Calc);
+int Sub (Code* Calc);
+int Mult(Code* Calc);
+int Div (Code* Calc);
+int Sqrt(Code* Calc);
 
-int Jump_A(stack* stk, Code* Calc);
-int In(stack* stk, Code* Calc);
+int Push(Code* Calc);
+int Pushr(Code* Calc);
+int PushM(Code* Calc);
+int PushMr(Code* Calc);
 
-int PrintRAM(int* RAM);
+int Popr(Code* Calc);
+int PopM(Code* Calc);
+int PopMr(Code* Calc);
 
-int RunCode(Code* Calc, stack* stk);
+int Jump(Code* Calc);
+int Jump_E(Code* Calc);
+int Jump_A(Code* Calc);
+
+int In(Code* Calc);
+int Outp(Code* Calc);
+
+int Call(Code* Calc);
+int Ret(Code* Calc);
+
+int PrintRAM(Code* Calc);
+
+int txPrintRAM(Code* Calc);
+
+typedef int (*Func)(Code*);
+
+Func Funcs[NUM_OF_COMMANDS] =
+{
+    NULL,    // [0]  HLT
+    Push,    // [1]  PUSH
+    Add,     // [2]  ADD
+    Sub,     // [3]  SUB
+    Div,     // [4]  DIVari
+    Outp,    // [5]  OUTP
+    Mult,    // [6]  MULT
+    Pushr,   // [7]  PUSHr
+    Popr,    // [8]  POPr
+    Jump,    // [9]  JMP
+    Jump_A,  // [10] JA
+    In,      // [11] INP
+    Call,    // [12] CALL
+    Ret,     // [13] RET
+    Sqrt,    // [14] SQRT
+    Jump_E,  // [15] JE
+    PushM,   // [16] PUSHM
+    PushMr,  // [17] PUSHMr
+    PopM,    // [18] POPM
+    PopMr,   // [19] POPMr
+    PrintRAM // [20] RAM
+};
+
+int RunCode(Code* Calc);
 
 int main(int argc, char *argv[])
 {
@@ -73,16 +122,16 @@ int main(int argc, char *argv[])
     Calc.registers = registers;
     Calc.RAM = RAM;
     InitStack(&Calc.ret, 10);
+    InitStack(&Calc.stk, 10);
 
     File input_file = {};
     input_file.filename = argv[1];
 
     Calc.buffer_size = ReadFile(&input_file, Calc.buffer);
 
-    stack stk = {};
-    InitStack(&stk, 10);
+    RunCode(&Calc);
 
-    RunCode(&Calc, &stk);
+    return 0;
 
 }
 
@@ -135,195 +184,135 @@ void CodeDump(Code* Calc)
     while ((c = getchar()) != '\n');*/
 }
 
-int Add(stack* stk, Code* Calc)
+int Add(Code* Calc)
 {
-    int a = StackPop(stk);
-    int b = StackPop(stk);
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
 
-    StackPush(stk, a + b);
-
-    Calc->ip++;
-}
-
-int Sub(stack* stk, Code* Calc)
-{
-    int a = StackPop(stk);
-    int b = StackPop(stk);
-
-    StackPush(stk, b - a);
+    StackPush(&Calc->stk, a + b);
 
     Calc->ip++;
 
+    return 0;
 }
 
-int Mult(stack* stk, Code* Calc)
+int Sub(Code* Calc)
 {
-    int a = StackPop(stk);
-    int b = StackPop(stk);
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
 
-    StackPush(stk, a * b);
+    StackPush(&Calc->stk, b - a);
 
     Calc->ip++;
+
+    return 0;
 }
 
-int Div(stack* stk, Code* Calc)
+int Mult(Code* Calc)
 {
-    int a = StackPop(stk);
-    int b = StackPop(stk);
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
+
+    StackPush(&Calc->stk, a * b);
+
+    Calc->ip++;
+
+    return 0;
+}
+
+int Div(Code* Calc)
+{
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
     if (a == 0)
     {
         printf("division by zero\n");
         abort();
     }
 
-    StackPush(stk, b / a);
+    StackPush(&Calc->stk, b / a);
 
     Calc->ip++;
+
+    return 0;
 }
 
-int Sqrt(stack* stk, Code* Calc)
+int Sqrt(Code* Calc)
 {
-    double a = (double) StackPop(stk);
+    double a = (double) StackPop(&Calc->stk);
 
-    StackPush(stk, (int) sqrt(a));
+    StackPush(&Calc->stk, (int) sqrt(a));
 
     Calc->ip++;
+
+    return 0;
 }
 
-int Jump_A(stack* stk, Code* Calc)
+int Jump_A(Code* Calc)
 {
-    int a = StackPop(stk);
-    int b = StackPop(stk);
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
 
     if (a > b) Calc->ip = Calc->buffer[Calc->ip + 1];
     else Calc->ip += 2;
+
+    return 0;
 }
 
-int Jump_E(stack* stk, Code* Calc)
+int Jump_E(Code* Calc)
 {
-    int a = StackPop(stk);
-    int b = StackPop(stk);
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
 
     if (a == b) Calc->ip = Calc->buffer[Calc->ip + 1];
     else Calc->ip += 2;
+
+    return 0;
 }
 
 int Call(Code* Calc)
 {
     StackPush(&Calc->ret, Calc->ip+2);
     Calc->ip = Calc->buffer[Calc->ip + 1];
+
+    return 0;
 }
 
-int In(stack* stk, Code* Calc)
+int In(Code* Calc)
 {
     int val = 0;
     if (!scanf("%d", &val)) abort();
-    StackPush(stk, val);
+    StackPush(&Calc->stk, val);
     Calc->ip ++;
     return 0;
 }
 
-int RunCode(Code* Calc, stack* stk)
+int RunCode(Code* Calc)
 {
-    while(Calc->ip < Calc->buffer_size)
+    while (Calc->ip < Calc->buffer_size)
     {
-        //CodeDump(Calc);
-        //STACK_DUMP(*stk);
-        //getchar();
+        int opcode = Calc->buffer[Calc->ip];
 
-        switch (Calc->buffer[Calc->ip])
+        if (opcode == HLT)
+            return 0;
+
+        if (opcode < 0 || opcode >= NUM_OF_COMMANDS || Funcs[opcode] == NULL)
         {
-            case PUSH: 
-                StackPush(stk, Calc->buffer[++Calc->ip]);
-                Calc->ip++;
-                break;
-            case PUSHr:
-                StackPush(stk, Calc->registers[Calc->buffer[++Calc->ip]]);
-                Calc->ip++;
-                break;
-            case PUSHM: 
-                StackPush(stk, Calc->RAM[Calc->buffer[++Calc->ip]]);
-                Calc->ip++;
-                break;
-            case PUSHMr:
-                StackPush(stk, Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]]);
-                Calc->ip++;
-                break;
-
-            case IN:
-                In(stk, Calc);
-                break;
-            
-            case POPr:
-                Calc->registers[Calc->buffer[++Calc->ip]] = StackPop(stk);
-                Calc->ip++;
-                break;
-            case POPM:
-                Calc->RAM[Calc->buffer[++Calc->ip]] = StackPop(stk);
-                Calc->ip++;
-                break;
-            case POPMr:
-                Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]] = StackPop(stk);
-                Calc->ip++;
-                break;
-
-            case ADD:
-                Add (stk, Calc);
-                break;
-            case SUB:
-                Sub (stk, Calc);
-                break;
-            case MULT:
-                Mult(stk, Calc);
-                break;
-            case DIVari:
-                Div (stk, Calc);
-                break;
-            case SQRT:
-                Sqrt(stk, Calc);
-                break;
-
-            case JMP:
-                Calc->ip = Calc->buffer[Calc->ip + 1];
-                break;
-            case JA:
-                Jump_A(stk, Calc);
-                break;
-            case JE:
-                Jump_E(stk, Calc);
-                break;
-
-            case CALL:
-                Call(Calc);
-                break;
-            case RET:
-                //STACK_DUMP(Calc->ret);
-                Calc->ip = StackPop(&Calc->ret);
-                break;
-
-            case OUT:
-                printf(GREEN "OUT OUTPUT: <%d>\n" RESETC, StackPop(stk));
-                Calc->ip++;
-                break;
-            case RAM:
-                PrintRAM(Calc->RAM);
-                Calc->ip++;
-                break;
-
-            case HLT:
-                return 0;
-            default: break;
+            printf("unknown opcode %d at ip=%d\n", opcode, Calc->ip);
+            return 1;
         }
-        
-    } 
+
+        Funcs[opcode](Calc);
+    }
+    return 0;
 }
 
-int PrintRAM(int* RAM)
+int PrintRAM(Code* Calc)
 {
     int i = 0;
     while (i < MAX_RAM)
     {
-        if (RAM[i]) printf(GREEN "*" RESETC);
+        if (Calc->RAM[i]) printf(GREEN "*" RESETC);
         else putchar('.');
         putchar(' ');
         
@@ -331,4 +320,91 @@ int PrintRAM(int* RAM)
 
         i++;
     }
+
+    Calc->ip++;
+}
+
+/*int txPrintRAM(Code* Calc)
+{
+    txCreateWindow(800, 600);
+    return 0;
+
+}*/
+
+int Push(Code* Calc)
+{
+    StackPush(&Calc->stk, Calc->buffer[++Calc->ip]);
+    Calc->ip++;
+
+    return 0;
+}
+
+int Pushr(Code* Calc)
+{
+    StackPush(&Calc->stk, Calc->registers[Calc->buffer[++Calc->ip]]);
+    Calc->ip++;
+
+    return 0;
+}
+
+int PushM(Code* Calc)
+{
+    StackPush(&Calc->stk, Calc->RAM[Calc->buffer[++Calc->ip]]);
+    Calc->ip++;
+
+    return 0;
+}
+
+int PushMr(Code* Calc)
+{
+    StackPush(&Calc->stk, Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]]);
+    Calc->ip++;
+
+    return 0;
+}
+
+int Popr(Code* Calc)
+{
+    Calc->registers[Calc->buffer[++Calc->ip]] = StackPop(&Calc->stk);
+    Calc->ip++;
+
+    return 0;
+}
+
+int PopM(Code* Calc)
+{
+    Calc->RAM[Calc->buffer[++Calc->ip]] = StackPop(&Calc->stk);
+    Calc->ip++;
+
+    return 0;
+}
+
+int PopMr(Code* Calc)
+{
+    Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]] = StackPop(&Calc->stk);
+    Calc->ip++;
+
+    return 0;
+}
+
+int Jump(Code* Calc)
+{
+    Calc->ip = Calc->buffer[Calc->ip + 1];
+
+    return 0;
+}
+
+int Ret(Code* Calc)
+{
+    Calc->ip = StackPop(&Calc->ret);
+
+    return 0;
+}
+
+int Outp(Code* Calc)
+{
+    printf(GREEN "OUT OUTPUT: <%d>\n" RESETC, StackPop(&Calc->stk));
+    Calc->ip++;
+
+    return 0;
 }
