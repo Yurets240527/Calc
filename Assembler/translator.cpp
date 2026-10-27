@@ -19,11 +19,10 @@ struct File
     int file_descriptor;
     struct stat st;
 };
-//TODO: hash DJB2
 
-struct Data
+struct Buffer
 {
-    char* buffer;
+    char* data;
     size_t size;
 };
 
@@ -34,7 +33,7 @@ struct ReadData
     
     int* Labels;
 
-    Data data; //TODO: struct
+    Buffer Data; //TODO: struct //TODO: struct  //TODO: struct  //TODO: struct  //TODO: struct //TODO: struct //TODO: struct 
 
     char** Lines;
 
@@ -173,7 +172,7 @@ int ParceJump(char* line, ReadData* Calc, char* command)
     int opcode = 0;
     if      (hash_djb2(command) == Commands_Info[JMP].hash && (strcmp(command, "JMP") == 0)) opcode = JMP;
     else if (hash_djb2(command) == Commands_Info[JA].hash  && (strcmp(command, "JA") == 0))  opcode = JA;
-    else if (hash_djb2(command) == Commands_Info[JE].hash  && (strcmp(command, "JE") == 0))  opcode = JE;
+    else if (hash_djb2(command) == Commands_Info[JE].hash  && (strcmp(command, "JE") == 0))  opcode = JE; //TODO: OTHER JUMPS
     else return -1;
 
     if (sscanf(line, "%*s %d", &value) == 1)
@@ -390,17 +389,17 @@ int GetCode(ReadData *Calc)
 
     int max_size = SizeOfFile(&(Calc->fpin));
 
-    Calc->data.buffer = (char *) calloc(max_size, sizeof(char));
+    Calc->Data.data = (char *) calloc(max_size, sizeof(char));
 
-    if (!Calc->data.buffer)
+    if (!Calc->Data.data)
     {
         printf("Memory error");
         return 1;
     }
 
-    Calc->data.size = ReadFile(&(Calc->fpin), Calc->data.buffer);
+    Calc->Data.size = ReadFile(&(Calc->fpin), Calc->Data.data);
 
-    int num_of_lines = CountSymbol(Calc->data.buffer, '\n', Calc->data.size) + 1;
+    int num_of_lines = CountSymbol(Calc->Data.data, '\n', Calc->Data.size) + 1;
     
     Calc->Lines = (char **) calloc(num_of_lines, sizeof(char *));
 
@@ -410,7 +409,7 @@ int GetCode(ReadData *Calc)
         return 1;
     }
     
-    FillLines(Calc->Lines, Calc->data.buffer, Calc->data.size);
+    FillLines(Calc->Lines, Calc->Data.data, Calc->Data.size);
 
     return 0;
 }

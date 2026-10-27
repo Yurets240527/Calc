@@ -35,6 +35,17 @@ enum Opcodes
     RAM    = 20,
 };
 
+enum FunctionTypes
+{
+    BIN_FUNC = 1,
+    JUMP     = 2,
+    PUSHING  = 3,
+    POPING   = 4,
+    NO_ARG   = 5,
+    INOUTPUT = 6,
+
+};
+
 struct Command
 {
     const char* name;
@@ -42,31 +53,33 @@ struct Command
     Opcodes opcode;
 
     int hash;
+
+    FunctionTypes type;
 };
 
 Command Commands_Info[NUM_OF_COMMANDS] = 
 {
-    {"HLT",  HLT,    hash_djb2("HLT")},
-    {"PUSH",  PUSH,  hash_djb2("PUSH")},
-    {"ADD",  ADD,    hash_djb2("ADD")},
-    {"SUB",  SUB,    hash_djb2("SUB")},
-    {"DIV",  DIVari, hash_djb2("DIV")},
-    {"OUT",  OUTP,   hash_djb2("OUT")},
-    {"MULT", MULT,   hash_djb2("MULT")},
-    {"PUSH",  PUSHr, hash_djb2("PUSH")},
-    {"POP",  POPr,   hash_djb2("POP")},
-    {"JMP",  JMP,    hash_djb2("JMP")},
-    {"JA",   JA,     hash_djb2("JA")},
-    {"IN",   INP,    hash_djb2("IN")},
-    {"CALL", CALL,   hash_djb2("CALL")},
-    {"RET",  RET,    hash_djb2("RET")},
-    {"SQRT", SQRT,   hash_djb2("SQRT")},
-    {"JE",   JE,     hash_djb2("JE")},
-    {"PUSHM", PUSHM, hash_djb2("PUSHM")},
-    {"PUSHM", PUSHMr,hash_djb2("PUSHM")},
-    {"POPM", POPM,   hash_djb2("POPM")},
-    {"POPM", POPMr,  hash_djb2("POPM")},
-    {"RAM",  RAM,    hash_djb2("RAM")},
+    {"HLT",  HLT,    hash_djb2("HLT"),   NO_ARG  },
+    {"PUSH",  PUSH,  hash_djb2("PUSH"),  PUSHING },
+    {"ADD",  ADD,    hash_djb2("ADD"),   BIN_FUNC},
+    {"SUB",  SUB,    hash_djb2("SUB"),   BIN_FUNC},
+    {"DIV",  DIVari, hash_djb2("DIV"),   BIN_FUNC},
+    {"OUT",  OUTP,   hash_djb2("OUT"),   INOUTPUT},
+    {"MULT", MULT,   hash_djb2("MULT"),  BIN_FUNC},
+    {"PUSH",  PUSHr, hash_djb2("PUSH"),  PUSHING },
+    {"POP",  POPr,   hash_djb2("POP"),   POPING  },
+    {"JMP",  JMP,    hash_djb2("JMP"),   JUMP    },
+    {"JA",   JA,     hash_djb2("JA"),    JUMP    },
+    {"IN",   INP,    hash_djb2("IN"),    INOUTPUT},
+    {"CALL", CALL,   hash_djb2("CALL"),  JUMP    },
+    {"RET",  RET,    hash_djb2("RET"),   NO_ARG  },
+    {"SQRT", SQRT,   hash_djb2("SQRT"),  BIN_FUNC},
+    {"JE",   JE,     hash_djb2("JE"),    JUMP    },
+    {"PUSHM", PUSHM, hash_djb2("PUSHM"), PUSHING },
+    {"PUSHM", PUSHMr,hash_djb2("PUSHM"), PUSHING },
+    {"POPM", POPM,   hash_djb2("POPM"),  POPING  },
+    {"POPM", POPMr,  hash_djb2("POPM"),  POPING  },
+    {"RAM",  RAM,    hash_djb2("RAM"),   NO_ARG  },
     
 };
 

@@ -20,7 +20,6 @@
 #define RESETC "\x1b[0m"
 #define GREEN "\x1b[32m"
 
-
 struct File
 {
     char *filename;
@@ -49,22 +48,30 @@ void CodeDump(Code* Calc);
 
 int Add (Code* Calc);
 int Sub (Code* Calc);
-int Mult(Code* Calc);
+int Mult(Code* Calc); //TODO: BIN_FUNCS
 int Div (Code* Calc);
 int Sqrt(Code* Calc);
+
+int BinFuncs(Code* Calc, int opcode);
 
 int Push(Code* Calc);
 int Pushr(Code* Calc);
 int PushM(Code* Calc);
 int PushMr(Code* Calc);
 
+int Pushing(Code* Calc, int opcode);
+
 int Popr(Code* Calc);
 int PopM(Code* Calc);
 int PopMr(Code* Calc);
 
+int Poping(Code* Calc, int opcode);
+
 int Jump(Code* Calc);
 int Jump_E(Code* Calc);
 int Jump_A(Code* Calc);
+
+int Jumping(Code* Calc, int opcode);
 
 int In(Code* Calc);
 int Outp(Code* Calc);
@@ -407,4 +414,109 @@ int Outp(Code* Calc)
     Calc->ip++;
 
     return 0;
+}
+
+int BinFuncs(Code* Calc, int opcode)
+{
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
+
+    switch (opcode)
+    {
+        case ADD:    {StackPush(&Calc->stk, a + b); break;}
+
+        case SUB:    {StackPush(&Calc->stk, b - a); break;}
+
+        case MULT:   {StackPush(&Calc->stk, a * b); break;}
+
+        case DIVari:
+            if (a == 0)
+                {
+                    printf("division by zero\n");
+                    abort();
+                }
+
+            StackPush(&Calc->stk, b / a);
+            break;
+        
+        case SQRT:   {StackPush(&Calc->stk, (int) sqrt((double) a)); break;}
+
+        default: break;
+
+    }
+
+    Calc->ip++;
+
+    return 0;
+
+}
+
+int Pushing(Code* Calc, int opcode)
+{
+    switch(opcode)
+    {
+        case PUSH:   {StackPush(&Calc->stk, Calc->buffer[++Calc->ip]); break;}
+
+        case PUSHr:  {StackPush(&Calc->stk, Calc->registers[Calc->buffer[++Calc->ip]]); break;}
+
+        case PUSHM:  {StackPush(&Calc->stk, Calc->RAM[Calc->buffer[++Calc->ip]]); break;}
+
+        case PUSHMr: {StackPush(&Calc->stk, Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]]); break;}
+
+        default: break;
+
+    }
+
+    Calc->ip++;
+
+    return 0;
+
+}
+
+int Poping(Code* Calc, int opcode)
+{
+    switch(opcode)
+    {
+        case POPr:  {Calc->registers[Calc->buffer[++Calc->ip]] = StackPop(&Calc->stk); break;}
+
+        case POPM:  {Calc->RAM[Calc->buffer[++Calc->ip]] = StackPop(&Calc->stk); break;}
+
+        case POPMr: {Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]] = StackPop(&Calc->stk); break;}
+
+        default: break;
+    }
+    
+    Calc->ip++;
+
+    return 0;
+}
+
+int Jumping(Code* Calc, int opcode)
+{
+    if (opcode == JMP)
+    {
+        Calc->ip = Calc->buffer[Calc->ip + 1];
+        return 0;
+    }
+
+    int a = StackPop(&Calc->stk);
+    int b = StackPop(&Calc->stk);
+
+    switch(opcode)
+    {
+        case JA:
+            if (a > b) Calc->ip = Calc->buffer[Calc->ip + 1];
+            else Calc->ip += 2;
+            break;
+        case JE:
+            if (a == b) Calc->ip = Calc->buffer[Calc->ip + 1];
+            else Calc->ip += 2;
+            break;
+
+        default: break;
+
+    }
+
+    return 0;
+    
 }
