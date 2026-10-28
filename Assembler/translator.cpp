@@ -33,7 +33,7 @@ struct ReadData
     
     int* Labels;
 
-    Buffer Data; //TODO: struct //TODO: struct  //TODO: struct  //TODO: struct  //TODO: struct //TODO: struct //TODO: struct 
+    Buffer Data;
 
     char** Lines;
 
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 
     CodePrint(&Calc);
 
-    WritetoBin(&Calc); //TODO: funtion
+    WritetoBin(&Calc);
 
     return 0;
 }
@@ -108,8 +108,6 @@ int FillBuffer(char** lines, ReadData* Calc)
 {
     char command[MAX_COMMAN_LEN] = {};
     int label = 0;
-    int value = 0;
-    int register_code = 0;
 
     Calc->code_len = 0;
 
