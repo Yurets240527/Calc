@@ -1,4 +1,4 @@
-//#include <TXLib.h>
+#include <TXLib.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -13,8 +13,9 @@
 
 #define CODE_CAPACITY 10000
 #define MAX_REGISTERS 5
-#define MAX_RAM 100
-#define SCREEN_WIDE 10
+#define SCREEN_WIDE 100
+#define SCREEN_HIGH 100
+#define MAX_RAM (SCREEN_WIDE * SCREEN_HIGH)
 
 #define RED "\x1b[31m"
 #define RESETC "\x1b[0m"
@@ -27,12 +28,17 @@ struct File
     struct stat st;
 };
 
+struct Buffer
+{
+    int* data;
+    size_t size;
+};
+
 struct Code
 {
     stack stk;
 
-    int *buffer;
-    size_t buffer_size;
+    Buffer buffer;
     int ip;
 
     int *registers;
@@ -60,6 +66,12 @@ int NoArgFuncs(Code* Calc, int opcode);
 
 int RunCode(Code* Calc);
 
+int txPrintRAM(Code* Calc);
+
+void InitWindow(const int CELL, const int MARGIN);
+
+int SPUctor(Code* Calc);
+
 
 int main(int argc, char *argv[])
 {
@@ -69,21 +81,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    int buffer[CODE_CAPACITY] = {};
-    int registers[MAX_REGISTERS] = {};
-    int RAM[MAX_RAM] = {};
-
+    InitWindow(10, 0);
+    
     Code Calc = {};
-    Calc.buffer = buffer;
-    Calc.registers = registers;
-    Calc.RAM = RAM;
-    InitStack(&Calc.ret, 10);
-    InitStack(&Calc.stk, 10);
+
+    SPUctor(&Calc);
 
     File input_file = {};
     input_file.filename = argv[1];
 
-    Calc.buffer_size = ReadFile(&input_file, Calc.buffer);
+    Calc.buffer.size = ReadFile(&input_file, Calc.buffer.data);
 
     RunCode(&Calc);
 
@@ -118,18 +125,18 @@ void CodeDump(Code* Calc)
 {
     printf("-------CODE DUMP---------\n< ");
 
-    int i = 0;
-    while (i < Calc->buffer_size)
+    unsigned int i = 0;
+    while (i < Calc->buffer.size)
     {
-        if (i == Calc->ip) printf(RED);
+        if ((int) i == Calc->ip) printf(RED);
 
-        if (Calc->buffer[i] == PUSH || Calc->buffer[i] == PUSHr
-         || Calc->buffer[i] == POPr || Calc->buffer[i] == JA || Calc->buffer[i] == CALL)
+        if (Calc->buffer.data[i] == PUSH || Calc->buffer.data[i] == PUSHr
+         || Calc->buffer.data[i] == POPr || Calc->buffer.data[i] == JA || Calc->buffer.data[i] == CALL)
         {
-            printf("%d %d ", Calc->buffer[i], Calc->buffer[i+1]);
+            printf("%d %d ", Calc->buffer.data[i], Calc->buffer.data[i+1]);
             i++;
         }
-        else printf("%d ", Calc->buffer[i]);
+        else printf("%d ", Calc->buffer.data[i]);
 
         printf(RESETC);
         i++;
@@ -143,9 +150,9 @@ void CodeDump(Code* Calc)
 
 int RunCode(Code* Calc)
 {
-    while (Calc->ip < Calc->buffer_size)
+    while (Calc->ip < (int) Calc->buffer.size)
     {
-        int opcode = Calc->buffer[Calc->ip];
+        int opcode = Calc->buffer.data[Calc->ip];
 
         if (opcode == HLT)
             return 0;
@@ -218,13 +225,13 @@ int Pushing(Code* Calc, int opcode)
 {
     switch(opcode)
     {
-        case PUSH:   {StackPush(&Calc->stk, Calc->buffer[++Calc->ip]); break;}
+        case PUSH:   {StackPush(&Calc->stk, Calc->buffer.data[++Calc->ip]); break;}
 
-        case PUSHr:  {StackPush(&Calc->stk, Calc->registers[Calc->buffer[++Calc->ip]]); break;}
+        case PUSHr:  {StackPush(&Calc->stk, Calc->registers[Calc->buffer.data[++Calc->ip]]); break;}
 
-        case PUSHM:  {StackPush(&Calc->stk, Calc->RAM[Calc->buffer[++Calc->ip]]); break;}
+        case PUSHM:  {StackPush(&Calc->stk, Calc->RAM[Calc->buffer.data[++Calc->ip]]); break;}
 
-        case PUSHMr: {StackPush(&Calc->stk, Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]]); break;}
+        case PUSHMr: {StackPush(&Calc->stk, Calc->RAM[Calc->registers[Calc->buffer.data[++Calc->ip]]]); break;}
 
         default: break;
 
@@ -240,11 +247,11 @@ int Poping(Code* Calc, int opcode)
 {
     switch(opcode)
     {
-        case POPr:  {Calc->registers[Calc->buffer[++Calc->ip]] = StackPop(&Calc->stk); break;}
+        case POPr:  {Calc->registers[Calc->buffer.data[++Calc->ip]] = StackPop(&Calc->stk); break;}
 
-        case POPM:  {Calc->RAM[Calc->buffer[++Calc->ip]] = StackPop(&Calc->stk); break;}
+        case POPM:  {Calc->RAM[Calc->buffer.data[++Calc->ip]] = StackPop(&Calc->stk); break;}
 
-        case POPMr: {Calc->RAM[Calc->registers[Calc->buffer[++Calc->ip]]] = StackPop(&Calc->stk); break;}
+        case POPMr: {Calc->RAM[Calc->registers[Calc->buffer.data[++Calc->ip]]] = StackPop(&Calc->stk); break;}
 
         default: break;
     }
@@ -258,7 +265,7 @@ int Jumping(Code* Calc, int opcode)
 {
     if (opcode == JMP)
     {
-        Calc->ip = Calc->buffer[Calc->ip + 1];
+        Calc->ip = Calc->buffer.data[Calc->ip + 1];
         return 0;
     }
 
@@ -268,17 +275,17 @@ int Jumping(Code* Calc, int opcode)
     switch(opcode)
     {
         case JA:
-            if (a > b) Calc->ip = Calc->buffer[Calc->ip + 1];
+            if (a > b) Calc->ip = Calc->buffer.data[Calc->ip + 1];
             else Calc->ip += 2;
             break;
         case JE:
-            if (a == b) Calc->ip = Calc->buffer[Calc->ip + 1];
+            if (a == b) Calc->ip = Calc->buffer.data[Calc->ip + 1];
             else Calc->ip += 2;
             break;
 
         case CALL:
             StackPush(&Calc->ret, Calc->ip+2);
-            Calc->ip = Calc->buffer[Calc->ip + 1];
+            Calc->ip = Calc->buffer.data[Calc->ip + 1];
 
         default: break;
 
@@ -316,7 +323,7 @@ int NoArgFuncs(Code* Calc, int opcode)
     {
         case RAM:
         {
-            int i = 0;
+            /*int i = 0;
             while (i < MAX_RAM)
             {
                 if (Calc->RAM[i]) printf(GREEN "*" RESETC);
@@ -328,7 +335,8 @@ int NoArgFuncs(Code* Calc, int opcode)
                 i++;
             }
 
-            Calc->ip++;
+            Calc->ip++;*/
+            txPrintRAM(Calc);
 
             break;
         }
@@ -340,4 +348,55 @@ int NoArgFuncs(Code* Calc, int opcode)
 
     return 0;
 
+}
+
+int txPrintRAM(Code* Calc)
+{
+    const int CELL   = 10;
+    const int MARGIN = 0;
+
+    txBegin();
+
+    txSetFillColor(TX_WHITE);
+    txClear();
+
+    for (int i = 0; i < MAX_RAM; i++)
+    {
+        int x = MARGIN + (i % SCREEN_WIDE) * CELL;
+        int y = MARGIN + (i / SCREEN_WIDE) * CELL;
+
+        COLORREF c = Calc->RAM[i] ? TX_GREEN : TX_WHITE;
+
+        txSetFillColor(c);
+        txSetColor(c);
+        txRectangle(x, y, x + CELL, y + CELL);
+    }
+
+    txEnd();
+
+    txSleep(10);
+    return 0;
+}
+
+void InitWindow(const int CELL, const int MARGIN)
+{
+    txCreateWindow(MARGIN * 2 + CELL * SCREEN_WIDE,
+                   MARGIN * 2 + CELL * SCREEN_HIGH);
+}
+
+int SPUctor(Code* Calc)
+{
+    int *buffer =    (int*) calloc(CODE_CAPACITY, sizeof(int));
+    int *registers = (int*) calloc(MAX_REGISTERS, sizeof(int));
+    int *RAM =       (int*) calloc(MAX_RAM, sizeof(int));
+
+    if(!buffer || !registers || !RAM) return printf("Calloc\n");
+
+    Calc->buffer.data = buffer;
+    Calc->registers = registers;
+    Calc->RAM = RAM;
+    InitStack(&Calc->ret, 10);
+    InitStack(&Calc->stk, 10);
+
+    return 0;
 }

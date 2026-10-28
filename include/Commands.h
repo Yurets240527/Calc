@@ -1,5 +1,7 @@
 #define NUM_OF_COMMANDS 21
 
+int hash_djb2(const char *str);
+
 int hash_djb2(const char *str)
 {
     int hash = 5381;

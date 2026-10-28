@@ -1,0 +1,85 @@
+PUSH 0
+POP AX       ; x = 0
+PUSH 0
+POP BX       ; y = 0
+PUSH 0
+POP CX       ; i = 0
+
+:0
+PUSH 0
+POP AX       ; x = 0, начало строки
+
+:1
+; --- dx = x - 50 ---
+PUSH AX
+PUSH 50
+SUB
+POP DX
+
+; --- dx^2 ---
+PUSH DX
+PUSH DX
+MULT
+
+; --- dy = y - 50 ---
+PUSH BX
+PUSH 50
+SUB
+POP DX
+
+; --- dy^2 ---
+PUSH DX
+PUSH DX
+MULT
+
+; --- d = dx^2 + dy^2 ---
+ADD
+POP DX
+
+; --- if d > 1600 → вне круга ---
+PUSH 1600
+PUSH DX
+JA :2
+
+; --- внутри круга: RAM[i] = 1 ---
+PUSH 1
+POPM [CX]
+JMP :3
+
+; --- вне круга: RAM[i] = 0 ---
+:2
+PUSH 0
+POPM [CX]
+
+:3
+PUSH CX
+PUSH 1
+ADD
+POP CX       ; i++
+
+PUSH AX
+PUSH 1
+ADD
+POP AX       ; x++
+
+PUSH AX
+PUSH 100
+JE :4        ; if x == 100 → конец строки
+
+JMP :1       ; иначе — следующая x
+
+:4
+PUSH BX
+PUSH 1
+ADD
+POP BX       ; y++
+
+PUSH BX
+PUSH 100
+JE :5        ; if y == 100 → конец
+
+JMP :0       ; иначе — новая строка
+
+:5
+RAM
+HLT

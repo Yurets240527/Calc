@@ -186,8 +186,7 @@ Errors StackVerifier(stack *stk)
     if (!stk->data)                return (stk->err_code = NULL_PTR);
     if (!stk->capacity)            return (stk->err_code = NULL_PTR);
     if (stk->size > stk->capacity) return (stk->err_code = MEMORY_ERROR);
-    if (stk->size < 0 ||
-        stk->size > MAX_CAPACITY)  return (stk->err_code = STACK_UNDERFLOW);
+    if (stk->size > MAX_CAPACITY)  return (stk->err_code = STACK_UNDERFLOW);
     if (stk->data[-1] != LEFT_PETUSHARA || 
     stk->data[stk->capacity] != RIGHT_PETUSHARA) return (stk->err_code = KILLED_PETUSHARA);
 
@@ -259,7 +258,7 @@ int StackDump(stack *stk, const char *file, int line, const char *func)
         else
             is_used = "unused";
 
-        printf("    data[%3d] = " STACK_ELEM_FMT "  (%s)\n",
+        printf("    data[%3u] = " STACK_ELEM_FMT "  (%s)\n",
                 i, stk->data[i], is_used);
     }
     printf("\n    Right petushara: " STACK_ELEM_FMT "\n\n", stk->data[stk->capacity]);
